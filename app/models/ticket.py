@@ -47,12 +47,23 @@ def _serialize(doc):
     return doc
 
 
-def create_ticket(customer_name, customer_email, subject, description):
+def create_ticket(
+    customer_name,
+    customer_email,
+    subject,
+    description,
+    customer_phone=None,
+    call_consent=False,
+):
     now = _now()
     ticket = {
         "ticket_id": _next_ticket_id(),
         "customer_name": customer_name.strip(),
         "customer_email": customer_email.strip(),
+        "customer_phone": customer_phone.strip() if customer_phone else None,
+        "call_consent": call_consent,
+        "voice_call_status": "pending" if call_consent else "not_requested",
+        "voice_call_sid": None,
         "subject": subject.strip(),
         "description": description.strip(),
         "status": "Open",
@@ -110,6 +121,13 @@ def update_ticket(ticket_id, status=None, note_text=None):
         add_note(ticket_id, note_text.strip())
 
     return get_ticket(ticket_id)
+
+
+def record_voice_call(ticket_id, status, call_sid=None):
+    update = {"voice_call_status": status}
+    if call_sid:
+        update["voice_call_sid"] = call_sid
+    _db().tickets.update_one({"ticket_id": ticket_id}, {"$set": update})
 
 
 def add_note(ticket_id, note_text):

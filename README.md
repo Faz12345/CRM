@@ -7,6 +7,7 @@ Built with Flask, MongoDB, Jinja2, JWT authentication, and a responsive server-r
 ## Features
 
 - Create support tickets with customer details, subject, and description
+- Optionally call ticket customers through Twilio after explicit consent, with an automated issue summary and reassurance
 - Generate unique ticket IDs such as `TKT-001`
 - Search tickets by ID, customer, email, subject, or description
 - Filter tickets by `Open`, `In Progress`, or `Closed`
@@ -39,6 +40,7 @@ Built with Flask, MongoDB, Jinja2, JWT authentication, and a responsive server-r
 - **Authentication:** PyJWT and Werkzeug password hashing
 - **Frontend:** Jinja2, HTML, CSS, vanilla JavaScript
 - **Email:** SMTP with Gmail, SendGrid, Mailgun, or another SMTP provider
+- **Voice:** Twilio Programmable Voice for consent-based ticket updates
 - **Deployment:** Gunicorn with Railway, Render, or another Python host
 
 ## Project structure
@@ -108,6 +110,21 @@ For a quick local demo without MongoDB, use:
 ```dotenv
 USE_MONGOMOCK=true
 ```
+
+### Twilio ticket calls
+
+To enable outbound calls, set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and
+`TWILIO_FROM_NUMBER` in the environment. The sender number must be a Twilio
+number enabled for voice calling. Leave these values unset to disable calling.
+
+When creating a ticket, enter the customer's phone in E.164 format (for
+example, `+14155552671`) and select the consent checkbox. The app only places
+a call when both the number and explicit consent are present. The call reads
+the ticket ID and issue title, then confirms that support will review the
+request; it does not read the full description. A queued/failed result is shown
+on the ticket, and a call failure does not prevent the ticket from being
+created. Configure Twilio and comply with applicable consent and calling rules
+before enabling this feature.
 
 The mock database is in memory and data disappears when the process stops. For persistent data, use MongoDB Atlas or a local MongoDB server and set:
 

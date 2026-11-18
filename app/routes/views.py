@@ -5,6 +5,7 @@ from pymongo.errors import DuplicateKeyError
 
 from app import auth
 from app import mailer
+from app import voice
 from app.models import user as user_model
 from app.models import ticket as ticket_model
 
@@ -114,6 +115,8 @@ def new_ticket():
     if request.method == "POST":
         customer_name = request.form.get("customer_name", "").strip()
         customer_email = request.form.get("customer_email", "").strip()
+        customer_phone = request.form.get("customer_phone", "").strip()
+        call_consent = request.form.get("call_consent") == "on"
         subject = request.form.get("subject", "").strip()
         description = request.form.get("description", "").strip()
 
@@ -122,6 +125,10 @@ def new_ticket():
             errors.append("Customer name is required.")
         if not customer_email:
             errors.append("Customer email is required.")
+        if customer_phone and not voice.is_valid_e164(customer_phone):
+            errors.append("Enter the customer phone in E.164 format, such as +14155552671.")
+        if call_consent and not customer_phone:
+            errors.append("A customer phone number is required to request an automated call.")
         if not subject:
             errors.append("Issue title is required.")
         if not description:
@@ -132,8 +139,21 @@ def new_ticket():
                 flash(e, "error")
             return render_template("create.html", form=request.form), 400
 
-        ticket = ticket_model.create_ticket(customer_name, customer_email, subject, description)
-        flash(f"Ticket {ticket['ticket_id']} created.", "success")
+        ticket = ticket_model.create_ticket(
+            customer_name,
+            customer_email,
+            subject,
+            description,
+            customer_phone=customer_phone,
+            call_consent=call_consent,
+        )
+        call_status = voice.notify_ticket_customer(ticket)
+        if call_status == "failed":
+            flash(f"Ticket {ticket['ticket_id']} created. {voice.call_failure_message()}", "error")
+        elif call_status == "queued":
+            flash(f"Ticket {ticket['ticket_id']} created. An automated call was queued.", "success")
+        else:
+            flash(f"Ticket {ticket['ticket_id']} created.", "success")
         return redirect(url_for("views.ticket_detail", ticket_id=ticket["ticket_id"]))
 
     return render_template("create.html", form={})

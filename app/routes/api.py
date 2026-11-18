@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from app.auth import admin_required, jwt_required
+from app import voice
 from app.models import ticket as ticket_model
 
 api_bp = Blueprint("api", __name__)
@@ -22,14 +23,31 @@ def create_ticket():
     if missing:
         return jsonify({"error": f"Missing required field(s): {', '.join(missing)}"}), 400
 
+    customer_phone = str(data.get("customer_phone") or "").strip()
+    call_consent = data.get("call_consent") is True
+    if customer_phone and not voice.is_valid_e164(customer_phone):
+        return jsonify({"error": "Customer phone must use E.164 format, such as +14155552671"}), 400
+    if call_consent and not customer_phone:
+        return jsonify({"error": "Customer phone is required when call_consent is true"}), 400
+
     ticket = ticket_model.create_ticket(
         customer_name=data["customer_name"],
         customer_email=data["customer_email"],
         subject=data["subject"],
         description=data["description"],
+        customer_phone=customer_phone,
+        call_consent=call_consent,
     )
+    call_status = voice.notify_ticket_customer(ticket)
+    result = {
+        "ticket_id": ticket["ticket_id"],
+        "created_at": _iso(ticket["created_at"]),
+        "voice_call_status": call_status,
+    }
+    if call_status == "failed":
+        result["warning"] = voice.call_failure_message()
     return (
-        jsonify({"ticket_id": ticket["ticket_id"], "created_at": _iso(ticket["created_at"])}),
+        jsonify(result),
         201,
     )
 
@@ -67,6 +85,9 @@ def get_ticket(ticket_id):
             "ticket_id": ticket["ticket_id"],
             "customer_name": ticket["customer_name"],
             "customer_email": ticket["customer_email"],
+            "customer_phone": ticket.get("customer_phone"),
+            "call_consent": ticket.get("call_consent", False),
+            "voice_call_status": ticket.get("voice_call_status", "not_requested"),
             "subject": ticket["subject"],
             "description": ticket["description"],
             "status": ticket["status"],

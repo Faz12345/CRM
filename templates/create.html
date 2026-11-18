@@ -19,6 +19,17 @@
     </div>
 
     <div class="form-row">
+      <label for="customer_phone">Customer phone <span class="hint">optional unless requesting a call; use E.164 format, e.g. +14155552671</span></label>
+      <input type="tel" id="customer_phone" name="customer_phone" autocomplete="tel" value="{{ form.get('customer_phone', '') }}">
+    </div>
+    <div class="form-row">
+      <label class="checkbox-label">
+        <input type="checkbox" name="call_consent" value="on" {{ 'checked' if form.get('call_consent') else '' }}>
+        Customer explicitly agreed to receive an automated call about this ticket
+      </label>
+    </div>
+
+    <div class="form-row">
       <label for="subject">Issue title</label>
       <input type="text" id="subject" name="subject" value="{{ form.get('subject', '') }}" placeholder="e.g. Can't reset password" required>
     </div>
