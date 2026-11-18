@@ -62,6 +62,7 @@ def create_ticket(
         "customer_email": customer_email.strip(),
         "customer_phone": customer_phone.strip() if customer_phone else None,
         "call_consent": call_consent,
+        "email_notification_status": "pending",
         "voice_call_status": "pending" if call_consent else "not_requested",
         "voice_call_sid": None,
         "subject": subject.strip(),
@@ -128,6 +129,13 @@ def record_voice_call(ticket_id, status, call_sid=None):
     if call_sid:
         update["voice_call_sid"] = call_sid
     _db().tickets.update_one({"ticket_id": ticket_id}, {"$set": update})
+
+
+def record_email_notification(ticket_id, status):
+    _db().tickets.update_one(
+        {"ticket_id": ticket_id},
+        {"$set": {"email_notification_status": status}},
+    )
 
 
 def add_note(ticket_id, note_text):

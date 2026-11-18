@@ -125,6 +125,8 @@ def new_ticket():
             errors.append("Customer name is required.")
         if not customer_email:
             errors.append("Customer email is required.")
+        elif not mailer.is_valid_email_address(customer_email):
+            errors.append("Enter a valid customer email address.")
         if customer_phone and not voice.is_valid_e164(customer_phone):
             errors.append("Enter the customer phone in E.164 format, such as +14155552671.")
         if call_consent and not customer_phone:
@@ -147,13 +149,26 @@ def new_ticket():
             customer_phone=customer_phone,
             call_consent=call_consent,
         )
+        email_status = mailer.send_ticket_created_email(ticket)
+        ticket_model.record_email_notification(ticket["ticket_id"], email_status)
         call_status = voice.notify_ticket_customer(ticket)
+        warnings = []
+        if email_status == "failed":
+            warnings.append("The ticket confirmation email could not be sent.")
+        elif email_status == "not_configured":
+            warnings.append("Email delivery is not configured.")
         if call_status == "failed":
-            flash(f"Ticket {ticket['ticket_id']} created. {voice.call_failure_message()}", "error")
-        elif call_status == "queued":
-            flash(f"Ticket {ticket['ticket_id']} created. An automated call was queued.", "success")
+            warnings.append(voice.call_failure_message())
+
+        message = f"Ticket {ticket['ticket_id']} created."
+        if email_status == "sent":
+            message += " A confirmation email was sent."
+        if call_status == "queued":
+            message += " An automated call was queued."
+        if warnings:
+            flash(f"{message} {' '.join(warnings)}", "error")
         else:
-            flash(f"Ticket {ticket['ticket_id']} created.", "success")
+            flash(message, "success")
         return redirect(url_for("views.ticket_detail", ticket_id=ticket["ticket_id"]))
 
     return render_template("create.html", form={})

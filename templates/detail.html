@@ -42,6 +42,7 @@
         <dl class="meta-list">
           <dt>Name</dt><dd>{{ ticket.customer_name }}</dd>
           <dt>Email</dt><dd><a href="mailto:{{ ticket.customer_email }}">{{ ticket.customer_email }}</a></dd>
+          <dt>Email notification</dt><dd>{{ ticket.email_notification_status|default('not_configured', true)|replace('_', ' ')|title }}</dd>
           <dt>Phone</dt><dd>{{ ticket.customer_phone or 'Not provided' }}</dd>
           <dt>Automated call</dt><dd>{{ ticket.voice_call_status|default('not_requested', true)|replace('_', ' ')|title }}</dd>
           <dt>Opened</dt><dd class="ts">{{ ticket.created_at.strftime('%d %b %Y, %H:%M') }}</dd>

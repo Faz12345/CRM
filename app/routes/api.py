@@ -1,7 +1,8 @@
 from flask import Blueprint, jsonify, request
 
-from app.auth import admin_required, jwt_required
+from app import mailer
 from app import voice
+from app.auth import admin_required, jwt_required
 from app.models import ticket as ticket_model
 
 api_bp = Blueprint("api", __name__)
@@ -23,6 +24,10 @@ def create_ticket():
     if missing:
         return jsonify({"error": f"Missing required field(s): {', '.join(missing)}"}), 400
 
+    customer_email = str(data.get("customer_email") or "").strip()
+    if not mailer.is_valid_email_address(customer_email):
+        return jsonify({"error": "A valid customer email address is required"}), 400
+
     customer_phone = str(data.get("customer_phone") or "").strip()
     call_consent = data.get("call_consent") is True
     if customer_phone and not voice.is_valid_e164(customer_phone):
@@ -32,20 +37,30 @@ def create_ticket():
 
     ticket = ticket_model.create_ticket(
         customer_name=data["customer_name"],
-        customer_email=data["customer_email"],
+        customer_email=customer_email,
         subject=data["subject"],
         description=data["description"],
         customer_phone=customer_phone,
         call_consent=call_consent,
     )
+    email_status = mailer.send_ticket_created_email(ticket)
+    ticket_model.record_email_notification(ticket["ticket_id"], email_status)
     call_status = voice.notify_ticket_customer(ticket)
     result = {
         "ticket_id": ticket["ticket_id"],
         "created_at": _iso(ticket["created_at"]),
+        "email_notification_status": email_status,
         "voice_call_status": call_status,
     }
+    warnings = []
+    if email_status == "failed":
+        warnings.append("The ticket confirmation email could not be sent.")
+    elif email_status == "not_configured":
+        warnings.append("Email delivery is not configured.")
     if call_status == "failed":
-        result["warning"] = voice.call_failure_message()
+        warnings.append(voice.call_failure_message())
+    if warnings:
+        result["warning"] = " ".join(warnings)
     return (
         jsonify(result),
         201,
@@ -87,6 +102,7 @@ def get_ticket(ticket_id):
             "customer_email": ticket["customer_email"],
             "customer_phone": ticket.get("customer_phone"),
             "call_consent": ticket.get("call_consent", False),
+            "email_notification_status": ticket.get("email_notification_status", "not_configured"),
             "voice_call_status": ticket.get("voice_call_status", "not_requested"),
             "subject": ticket["subject"],
             "description": ticket["description"],

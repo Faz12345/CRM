@@ -7,6 +7,7 @@ Built with Flask, MongoDB, Jinja2, JWT authentication, and a responsive server-r
 ## Features
 
 - Create support tickets with customer details, subject, and description
+- Email customers a ticket receipt through SMTP
 - Optionally call ticket customers through Twilio after explicit consent, with an automated issue summary and reassurance
 - Generate unique ticket IDs such as `TKT-001`
 - Search tickets by ID, customer, email, subject, or description
@@ -51,7 +52,7 @@ app/
   __init__.py                Flask app factory and database initialization
   auth.py                    JWT validation and role decorators
   config.py                  Environment-based configuration
-  mailer.py                  SMTP password-reset email delivery
+  mailer.py                  SMTP ticket receipts and account-recovery email
   models/
     ticket.py                Ticket and note data access
     user.py                  User and reset-token data access
@@ -192,9 +193,11 @@ Authorization: Bearer <access-token>
 | `GET` | `/api/tickets/<ticket_id>` | Authenticated users |
 | `PUT` | `/api/tickets/<ticket_id>` | Admins only |
 
-## SMTP password recovery
+## SMTP ticket email and account recovery
 
-The application sends password-reset emails through authenticated SMTP. Gmail users must enable 2-Step Verification and create a Google **App Password**. Do not use a normal Gmail password or a Google passkey for SMTP.
+The application sends ticket receipts and password-reset links through authenticated SMTP. Ticket creation emails the customer the ticket ID, issue title, and a short confirmation. Delivery status is saved on the ticket; if SMTP is not configured or delivery fails, the ticket is still created and the CRM shows a warning.
+
+The existing account recovery flow is available from **Forgot password?** on the login page or through `/forgot-password`. It sends a one-hour password-reset link to the account email address. Gmail users must enable 2-Step Verification and create a Google **App Password**. Do not use a normal Gmail password or a Google passkey for SMTP.
 
 Example Gmail configuration:
 
